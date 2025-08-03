@@ -24,16 +24,14 @@ fn waitForEnter() !void {
     should_exit.store(true, .seq_cst);
 }
 
-fn draw_donut(buffer: [][]u8, A: f32, B: f32) void {
+fn draw_donut(buffer: []u8, A: f32, B: f32) void {
     const cosA: f32 = std.math.cos(A);
     const sinA: f32 = std.math.sin(A);
     const cosB: f32 = std.math.cos(B);
     const sinB: f32 = std.math.sin(B);
 
     // Clean the buffer
-    for (buffer) |row| {
-        @memset(row, ' ');
-    }
+    @memset(buffer, ' ');
 
     var zbuffer: [screen_width][screen_height]f32 = [_][screen_height]f32{[_]f32{0.0} ** screen_height} ** screen_width;
 
@@ -61,6 +59,7 @@ fn draw_donut(buffer: [][]u8, A: f32, B: f32) void {
             if (xp >= 0 and xp < screen_width and yp >= 0 and yp < screen_height) {
                 const xp_u: usize = @intCast(xp);
                 const yp_u: usize = @intCast(yp);
+                const buffer_index = yp_u * screen_width + xp_u;
 
                 const L = cosPhi * cosTheta * sinB - cosA * cosTheta * sinPhi - sinA * sinTheta + cosB * (cosA * sinTheta - cosTheta * sinA * sinPhi);
 
@@ -69,7 +68,7 @@ fn draw_donut(buffer: [][]u8, A: f32, B: f32) void {
                         zbuffer[xp_u][yp_u] = ooz;
                         // clamp luminance index to valid range
                         const luminance_index: usize = @min(@as(usize, @intFromFloat(L * 8)), ascii_gradient.len - 1);
-                        buffer[xp_u][yp_u] = ascii_gradient[luminance_index];
+                        buffer[buffer_index] = ascii_gradient[luminance_index];
                     }
                 }
             }
@@ -77,8 +76,15 @@ fn draw_donut(buffer: [][]u8, A: f32, B: f32) void {
     }
 }
 
-fn print_buffer(buffer: [][]u8, writer: anytype) !void {
-    for (buffer) |row| {
+fn print_buffer(buffer: []const u8, writer: anytype) !void {
+    // for (buffer) |row| {
+    //     try writer.print("{s}\n", .{row});
+    // }
+    var i: usize = 0;
+    while (i < screen_height) : (i += 1) {
+        const row_start = i * screen_width;
+        const row_end = row_start + screen_width;
+        const row = buffer[row_start..row_end];
         try writer.print("{s}\n", .{row});
     }
 }
@@ -86,17 +92,8 @@ fn print_buffer(buffer: [][]u8, writer: anytype) !void {
 pub fn main() !void {
     const allocator = std.heap.c_allocator;
 
-    const buffer = try allocator.alloc([]u8, screen_width);
-    defer {
-        for (buffer) |row| {
-            allocator.free(row);
-        }
-        allocator.free(buffer);
-    }
-
-    for (buffer) |*row| {
-        row.* = try allocator.alloc(u8, screen_height);
-    }
+    const buffer = try allocator.alloc(u8, screen_width * screen_height);
+    defer allocator.free(buffer);
 
     _ = try std.Thread.spawn(.{}, waitForEnter, .{});
 
