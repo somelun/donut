@@ -24,7 +24,7 @@ fn waitForEnter() !void {
     should_exit.store(true, .seq_cst);
 }
 
-fn draw_donut(buffer: []u8, A: f32, B: f32) void {
+fn draw_donut(buffer: []u8, z_buffer: []f32, A: f32, B: f32) void {
     const cosA: f32 = std.math.cos(A);
     const sinA: f32 = std.math.sin(A);
     const cosB: f32 = std.math.cos(B);
@@ -32,8 +32,7 @@ fn draw_donut(buffer: []u8, A: f32, B: f32) void {
 
     // Clean the buffer
     @memset(buffer, ' ');
-
-    var zbuffer: [screen_width][screen_height]f32 = [_][screen_height]f32{[_]f32{0.0} ** screen_height} ** screen_width;
+    @memset(z_buffer, 0.0);
 
     var theta: f32 = 0;
     while (theta < 2 * std.math.pi) : (theta += delta_theta) {
@@ -64,8 +63,8 @@ fn draw_donut(buffer: []u8, A: f32, B: f32) void {
                 const L = cosPhi * cosTheta * sinB - cosA * cosTheta * sinPhi - sinA * sinTheta + cosB * (cosA * sinTheta - cosTheta * sinA * sinPhi);
 
                 if (L > 0) {
-                    if (ooz > zbuffer[xp_u][yp_u]) {
-                        zbuffer[xp_u][yp_u] = ooz;
+                    if (ooz > z_buffer[buffer_index]) {
+                        z_buffer[buffer_index] = ooz;
                         // clamp luminance index to valid range
                         const luminance_index: usize = @min(@as(usize, @intFromFloat(L * 8)), ascii_gradient.len - 1);
                         buffer[buffer_index] = ascii_gradient[luminance_index];
@@ -77,9 +76,6 @@ fn draw_donut(buffer: []u8, A: f32, B: f32) void {
 }
 
 fn print_buffer(buffer: []const u8, writer: anytype) !void {
-    // for (buffer) |row| {
-    //     try writer.print("{s}\n", .{row});
-    // }
     var i: usize = 0;
     while (i < screen_height) : (i += 1) {
         const row_start = i * screen_width;
@@ -95,6 +91,9 @@ pub fn main() !void {
     const buffer = try allocator.alloc(u8, screen_width * screen_height);
     defer allocator.free(buffer);
 
+    const z_buffer = try allocator.alloc(f32, screen_width * screen_height);
+    defer allocator.free(z_buffer);
+
     _ = try std.Thread.spawn(.{}, waitForEnter, .{});
 
     var A: f32 = 0.0;
@@ -105,7 +104,7 @@ pub fn main() !void {
         // clear screen and move cursor to top-left
         _ = stdout.print("\x1B[2J\x1B[H", .{}) catch {};
 
-        draw_donut(buffer, A, B);
+        draw_donut(buffer, z_buffer, A, B);
         try print_buffer(buffer, stdout);
 
         A += 0.04;
