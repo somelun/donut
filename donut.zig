@@ -24,6 +24,7 @@ fn wait_for_enter() !void {
     should_exit.store(true, .seq_cst);
 }
 
+// https://en.wikipedia.org/wiki/Givens_rotation
 inline fn rotate_and_normalize(t: f32, x: *f32, y: *f32) void {
     const f_temp = x.*;
     x.* -= t * y.*;
@@ -38,17 +39,26 @@ fn draw_donut(buffer: []u8, z_buffer: []f32, cosA: f32, sinA: f32, cosB: f32, si
     @memset(buffer, ' ');
     @memset(z_buffer, 0.0);
 
-    var theta: f32 = 0;
-    while (theta < 2 * std.math.pi) : (theta += delta_theta) {
-        const cosTheta = std.math.cos(theta);
-        const sinTheta = std.math.sin(theta);
+    var cosTheta: f32 = 1.0;
+    var sinTheta: f32 = 0.0;
+
+    var theta_steps: i32 = 0;
+    const max_theta_steps = @as(i32, @intFromFloat(2.0 * std.math.pi / delta_theta));
+
+    while (theta_steps < max_theta_steps) : (theta_steps += 1) {
         const circle_x: f32 = R2 + R1 * cosTheta;
         const circle_y: f32 = R1 * sinTheta;
 
-        var phi: f32 = 0;
-        while (phi < 2 * std.math.pi) : (phi += delta_phi) {
-            const cosPhi = std.math.cos(phi);
-            const sinPhi = std.math.sin(phi);
+        // var phi: f32 = 0;
+        // while (phi < 2 * std.math.pi) : (phi += delta_phi) {
+        var cosPhi: f32 = 1.0;
+        var sinPhi: f32 = 0.0;
+
+        var phi_steps: i32 = 0;
+        const max_phi_steps = @as(i32, @intFromFloat(2.0 * std.math.pi / delta_phi));
+        while (phi_steps < max_phi_steps) : (phi_steps += 1) {
+            // const cosPhi = std.math.cos(phi);
+            // const sinPhi = std.math.sin(phi);
 
             const x: f32 = circle_x * (cosB * cosPhi + sinA * sinB * sinPhi) - circle_y * cosA * sinB;
             const y: f32 = circle_x * (sinB * cosPhi - sinA * cosB * sinPhi) + circle_y * cosA * cosB;
@@ -75,7 +85,9 @@ fn draw_donut(buffer: []u8, z_buffer: []f32, cosA: f32, sinA: f32, cosB: f32, si
                     }
                 }
             }
+            rotate_and_normalize(delta_phi, &cosPhi, &sinPhi);
         }
+        rotate_and_normalize(delta_theta, &cosTheta, &sinTheta);
     }
 }
 
