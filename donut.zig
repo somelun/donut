@@ -2,8 +2,8 @@ const std = @import("std");
 
 const ascii_gradient = ".,-~:;=!*#$@";
 
-const screen_width = 80;
-const screen_height = 80;
+const screen_width = 90;
+const screen_height = 90;
 
 const R1 = 1.0;
 const R2 = 2.0;
@@ -15,7 +15,7 @@ const delta_phi = 0.02;
 
 var should_exit = std.atomic.Value(bool).init(false);
 
-fn waitForEnter() !void {
+fn wait_for_enter() !void {
     const stdin = std.io.getStdIn();
     const reader = stdin.reader();
 
@@ -24,13 +24,17 @@ fn waitForEnter() !void {
     should_exit.store(true, .seq_cst);
 }
 
-fn draw_donut(buffer: []u8, z_buffer: []f32, A: f32, B: f32) void {
-    const cosA: f32 = std.math.cos(A);
-    const sinA: f32 = std.math.sin(A);
-    const cosB: f32 = std.math.cos(B);
-    const sinB: f32 = std.math.sin(B);
+inline fn rotate_and_normalize(t: f32, x: *f32, y: *f32) void {
+    const f_temp = x.*;
+    x.* -= t * y.*;
+    y.* += t * f_temp;
+    const f = (3.0 - x.* * x.* - y.* * y.*) * 0.5;
+    x.* *= f;
+    y.* *= f;
+}
 
-    // Clean the buffer
+fn draw_donut(buffer: []u8, z_buffer: []f32, cosA: f32, sinA: f32, cosB: f32, sinB: f32) void {
+    // Clean the buffers
     @memset(buffer, ' ');
     @memset(z_buffer, 0.0);
 
@@ -86,29 +90,26 @@ fn print_buffer(buffer: []const u8, writer: anytype) !void {
 }
 
 pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+    var buffer: [screen_width * screen_height]u8 = undefined;
+    var z_buffer: [screen_width * screen_height]f32 = undefined;
 
-    const buffer = try allocator.alloc(u8, screen_width * screen_height);
-    defer allocator.free(buffer);
+    _ = try std.Thread.spawn(.{}, wait_for_enter, .{});
 
-    const z_buffer = try allocator.alloc(f32, screen_width * screen_height);
-    defer allocator.free(z_buffer);
-
-    _ = try std.Thread.spawn(.{}, waitForEnter, .{});
-
-    var A: f32 = 0.0;
-    var B: f32 = 0.0;
+    var cosA: f32 = 1.0;
+    var sinA: f32 = 0.0;
+    var cosB: f32 = 1.0;
+    var sinB: f32 = 0.0;
     const stdout = std.io.getStdOut().writer();
 
     while (!should_exit.load(.seq_cst)) {
         // clear screen and move cursor to top-left
         _ = stdout.print("\x1B[2J\x1B[H", .{}) catch {};
 
-        draw_donut(buffer, z_buffer, A, B);
-        try print_buffer(buffer, stdout);
+        draw_donut(&buffer, &z_buffer, cosA, sinA, cosB, sinB);
+        try print_buffer(&buffer, stdout);
 
-        A += 0.04;
-        B += 0.02;
+        rotate_and_normalize(0.04, &cosA, &sinA);
+        rotate_and_normalize(0.02, &cosB, &sinB);
 
         std.time.sleep(50 * std.time.ns_per_ms);
     }
