@@ -49,17 +49,12 @@ fn draw_donut(buffer: []u8, z_buffer: []f32, cosA: f32, sinA: f32, cosB: f32, si
         const circle_x: f32 = R2 + R1 * cosTheta;
         const circle_y: f32 = R1 * sinTheta;
 
-        // var phi: f32 = 0;
-        // while (phi < 2 * std.math.pi) : (phi += delta_phi) {
         var cosPhi: f32 = 1.0;
         var sinPhi: f32 = 0.0;
 
         var phi_steps: i32 = 0;
         const max_phi_steps = @as(i32, @intFromFloat(2.0 * std.math.pi / delta_phi));
         while (phi_steps < max_phi_steps) : (phi_steps += 1) {
-            // const cosPhi = std.math.cos(phi);
-            // const sinPhi = std.math.sin(phi);
-
             const x: f32 = circle_x * (cosB * cosPhi + sinA * sinB * sinPhi) - circle_y * cosA * sinB;
             const y: f32 = circle_x * (sinB * cosPhi - sinA * cosB * sinPhi) + circle_y * cosA * cosB;
             const z: f32 = K2 + cosA * circle_x * sinPhi + circle_y * sinA;
@@ -92,12 +87,10 @@ fn draw_donut(buffer: []u8, z_buffer: []f32, cosA: f32, sinA: f32, cosB: f32, si
 }
 
 fn print_buffer(buffer: []const u8, writer: anytype) !void {
-    var i: usize = 0;
-    while (i < screen_height) : (i += 1) {
+    for (0..screen_height) |i| {
         const row_start = i * screen_width;
-        const row_end = row_start + screen_width;
-        const row = buffer[row_start..row_end];
-        try writer.print("{s}\n", .{row});
+        try writer.writeAll(buffer[row_start .. row_start + screen_width]);
+        try writer.writeByte('\n');
     }
 }
 
